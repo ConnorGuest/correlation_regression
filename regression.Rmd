@@ -1,0 +1,389 @@
+---
+title: "Correlation and Regression"
+author: "Connor Guest"
+date: "6/6/2019"
+output: 
+  html_document:
+    theme: cosmo
+    highlight: monochrome
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    code_folding: hide
+    number_sections: true
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Ultimately data analysis is about understanding the relationship between two variables.
+
+Statistical models have one variable as the output (response variable, y, aka dependent) and one or more as the input (explannatory variable, x, independent).
+
+```{r, message=FALSE}
+library(openintro)
+library(ggplot2)
+library(knitr)
+library(dplyr)
+library(ggthemes)
+library(readr)
+```
+
+
+```{r}
+data(ncbirths)
+
+# Scatterplot of weight vs. weeks
+ncbirths %>% 
+  ggplot(aes(x = weeks, y = weight)) +
+  geom_point() +
+  theme_economist()
+
+# Boxplot of weight vs. weeks
+ggplot(data = ncbirths, 
+       aes(x = cut(weeks, breaks = 5), y = weight)) + 
+  geom_boxplot() +
+  theme_economist()
+```
+
+look for:  
+form - linear, quadratic, non-linear  
+direction - postive or negative, do they variables go up together?
+strength - how much scatter / noise
+outliers - these can be revealing
+when analysing a relationship between variables
+
+```{r}
+# Mammals scatterplot
+ggplot(data = mammals, 
+       aes(x = BodyWt, y = BrainWt)) + 
+  geom_point() +
+  theme_economist()
+
+# Scatterplot with coord_trans()
+ggplot(data = mammals, aes(x = BodyWt, y = BrainWt)) +
+  geom_point() + 
+  coord_trans(x = "log10", y = "log10") +
+  theme_economist()
+
+# Correlation among mammals, with and without log
+mammals %>%
+  summarize(N = n(), 
+            r = cor(BodyWt, BrainWt), 
+            r_log = cor(log(BodyWt), log(BrainWt)))
+
+```
+
+```{r}
+
+# Baseball player scatterplot
+ggplot(data = mlbBat10, 
+       aes(x = OBP, y = SLG)) + 
+  geom_point() +
+  theme_economist()
+
+# Correlation for all baseball players
+mlbBat10 %>%
+  summarize(N = n(), r = cor(OBP, SLG))
+
+```
+
+```{r}
+
+# Body dimensions scatterplot
+ggplot(data = bdims, 
+       aes(x = hgt, y = wgt, color = factor(sex))) + 
+  geom_point() +
+  theme_economist()
+
+# Correlation of body dimensions
+bdims %>%
+  group_by(sex) %>%
+  summarize(N = n(), r = cor(wgt, hgt))
+
+```
+
+```{r}
+
+# Smoking scatterplot
+ggplot(data = smoking, 
+       aes(x = age, y = amtWeekdays)) + 
+  geom_point() +
+  theme_economist()
+```
+
+changing coordinates
+```{r}
+# Scatterplot with coord_trans()
+ggplot(data = mammals, aes(x = BodyWt, y = BrainWt)) +
+  geom_point() + 
+  coord_trans(x = "log10", y = "log10") +
+  theme_economist()
+
+# Scatterplot with scale_x_log10() and scale_y_log10()
+ggplot(data = mammals, aes(x = BodyWt, y = BrainWt)) +
+  geom_point() +
+  scale_x_log10() + scale_y_log10() +
+  theme_economist()
+```
+
+Dealing with outliers
+You can add geom_point(alpha = .5) to reduce the transparency of the points so you can see where points are on top of eachother
+geom_point(postion = "jitter") which gives some random noise to the points 
+
+
+```{r}
+# Scatterplot of SLG vs. OBP
+mlbBat10 %>%
+  filter(AB >= 200) %>%
+  ggplot(aes(x = OBP, y = SLG)) +
+  geom_point(alpha=.5, position="jitter") + theme_economist()
+
+# Identify the outlying player
+mlbBat10 %>%
+  filter(AB >= 200, OBP < 0.2) 
+
+# Correlation for all players with at least 200 ABs
+mlbBat10 %>%
+  filter(AB >= 200) %>%
+  summarize(N = n(), r = cor(OBP, SLG)) 
+```
+
+Correlation - quantifying the strenght of a **linear** realtionship - doesnt quantify relationships for non-linear relationships
+Correlation coef is between -1 and 1 
+Sign is the direction
+close to 1 is near perfect
+correlation is most often defined by the **pearson product moment correlation**
+
+
+## **Computing Correlation**
+The cor(x, y) function will compute the **Pearson product-moment correlation** between variables, x and y. **Since this quantity is symmetric with respect to x and y, it doesn't matter in which order you put the variables.**
+
+At the same time, **the cor() function is very conservative when it encounters missing data (e.g. NAs).** The use argument allows you to override the default behavior of returning NA whenever any of the values encountered is NA. **Setting the use argument to "pairwise.complete.obs" allows cor() to compute the correlation coefficient for those observations where the values of x and y are both not missing.**
+
+```{r}
+# Scatterplot of birthweight of babies and mothers age
+ncbirths %>%
+  ggplot(aes(x = mage, y = weight)) +
+  geom_point(alpha=.5, position="jitter") +
+  theme_economist() +
+  labs(
+    x = "Mother's Age",
+    y = "Baby Weight",
+    title = "Relationship between Age of Mother and Baby Weight",
+    subtitle = "Not much of a correlation is seen",
+    caption = "r = .55"
+  )
+
+#find the correlation between baby weight and mothers age
+# Compute correlation
+ncbirths %>%
+  summarize(N = n(), r = cor(weight, mage))
+
+# Scatterplot of birthweight of babies and weeks of gestation
+ncbirths %>%
+  ggplot(aes(x = weeks, y = weight)) +
+  geom_point(alpha=.5, position="jitter") +
+  theme_economist() +
+  labs(
+    x = "Weeks of Gestation",
+    y = "Baby Weight",
+    title = "Relationship between Age of Mother and Baby Weight",
+    subtitle = "A stronger correlation is seen",
+    caption = "r = .67"
+  )
+
+
+# Compute correlation for all non-missing pairs
+ncbirths %>%
+  summarize(N = n(), r = cor(weight, weeks, use = "pairwise.complete.obs"))
+
+```
+
+## **Correlation**
+### Anscombe Data Set
+Created by statistician Francis Anscombe in 1973, the data set is used to illustarte concepts of correlation and regression.  
+Each set has the same sumamry statistics, correlation, and regression line.  
+Correlation coefficient and regression line.the correlation coef in each case here is **0.82**  
+Above all, this data set shows the imporatnce of visually inspecting your data.  
+
+
+```{r, message=FALSE}
+# load the anscombe data set
+Anscombe <- read_csv("Anscombe.csv")
+```
+
+As you can see, the sumamry statistics for each set is the same.
+```{r}
+# Compute properties of Anscombe
+Anscombe %>%
+  group_by(Set) %>%
+  summarize(N = n(), mean(x), sd(x), mean(y), sd(y), cor(x, y))
+```
+
+Let's take a look at the data.
+```{r}
+# graph each set
+ggplot(data = Anscombe, aes(x = x, y = y)) +
+  geom_point() +
+  facet_wrap(~ Set) +
+  theme_economist()
+```
+
+### Correlation does not imply causation
+Correlation is a simple bivariate statistic. Only explains realtionship between two variables. Need to use multiple regression model to get the raltionship between multiple variables.  
+
+The proper way to talk about correlation:
+
+- "Counties with lower high school graduation rates are likely to have higher poverty rates."  
+- "It may be that a longer gestational period contributes to a heavier birthweight among babies, but a randomized, controlled experiment is needed to confirm this observation."     
+- "These data suggest that babies with longer gestational periods tend to be heavier at birth, but there are many potential confounding factors that were not taken into account."    
+- There are many potential confounders that can cloud our ability to determine casue and effect.    
+- Correlations are called **spurious**.    
+- Time can be a confounder between two variables.    
+
+## **Regression**
+Regression uses the least squares criterion to determine the best fit line - the least squares regression line.  
+You can add this line by adding: + geom_smooth(method = "lm") 
+This is a "best fit" line that cuts through the data in a way that minimizes the distance between the line and the data points.  
+Blue is the line. Gray is the standard error.  
+
+```{r}
+# Scatterplot with regression line
+ggplot(data = bdims, aes(x = hgt, y = wgt)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_economist()
+```
+
+Response = f(explanatory) + noise
+In a regression model, we specify that the distribution of the noise is normal with mean 0 and a fixed standard deviation.  
+The residuals are the realization of the noise term.  
+e = y - y(hat)  
+Residuals sum to zero.  
+Regression slope and correlation coef are closely related  
+**Key Concepts**
+y-hat is the expected vale given what we know about x
+Noise is a better term than error.  
+  
+**Linear Regression Model** takes the form:  
+  
+***Y=β0+β1⋅X+ϵ, where ϵ∼N(0,σϵ)* **
+  
+β1 is the slope coefficient  
+
+**Regression model output terminology**  
+
+The fitted model for the poverty rate of U.S. counties as a function of high school graduation rate is:  
+  
+**povertyˆ=64.594−0.591⋅hs_grad **  
+  
+In Hampshire County in western Massachusetts, the high school graduation rate is 92.4%. These two facts imply that the poverty rate in Hampshire County is ... ~expected to be about 10.0%.~  
+
+**Fitting a linear model "by hand"**
+Recall the simple linear regression model:  
+Y=b0+b1⋅X  
+Two facts enable you to compute the slope b1 and intercept b0 of a simple linear regression model from some basic summary statistics.  
+  
+First, the slope can be defined as:  
+  
+b1=rX,Y⋅sYsX  
+where rX,Y represents the correlation (cor()) of X and Y and sX and sY represent the standard deviation (sd()) of X and Y, respectively.  
+
+Second, the point (x¯,y¯) is always on the least squares regression line, where x¯ and y¯ denote the average of x and y, respectively.  
+
+<!-- ```{r} -->
+<!-- # Print bdims_summary -->
+<!-- bdims_summary -->
+
+<!-- # Add slope and intercept -->
+<!-- bdims_summary %>% -->
+<!--   mutate(slope = r * sd_wgt / sd_hgt,  -->
+<!--          intercept = mean_wgt - slope * mean_hgt) -->
+<!-- ``` -->
+
+Regression models combine some explanatory variables into an estimate for a single numerical response variable.  
+
+## **Regression to the Mean**
+Regression to the mean is a concept attributed to Sir Francis Galton. The basic idea is that extreme random observations will tend to be less extreme upon a second trial. This is simply due to chance alone. While "regression to the mean" and "linear regression" are not the same thing, we will examine them together in this exercise.  
+  
+One way to see the effects of regression to the mean is to compare the heights of parents to their children's heights. While it is true that tall mothers and fathers tend to have tall children, those children tend to be less tall than their parents, relative to average. That is, fathers who are 3 inches taller than the average father tend to have children who may be taller than average, but by less than 3 inches.  
+  
+The Galton_men and Galton_women datasets contain data originally collected by Galton himself in the 1880s on the heights of men and women, respectively, along with their parents' heights.  
+```{r}
+library(HistData)
+data(Galton)
+
+# Height of children vs. height of father
+ggplot(data = Galton, aes(x = parent, y = child)) +
+  geom_point() + 
+  geom_abline(slope = 1, intercept = 0) + 
+  geom_smooth(method = "lm", se = FALSE)
+
+```
+
+In an opinion piece about nepotism [published in The New York Times](http://www.nytimes.com/2015/03/22/opinion/sunday/seth-stephens-davidowitz-just-how-nepotistic-are-we.html) in 2015, economist Seth Stephens-Davidowitz wrote that:  
+  
+> "Regression to the mean is so powerful that once-in-a-generation talent basically never sires once-in-a-generation talent. It explains why Michael Jordan’s sons were middling college basketball players and Jakob Dylan wrote two good songs. It is why there are no American parent-child pairs among Hall of Fame players in any major professional sports league."
+
+### **Regression Coefficients & Fitting Regression Models**
+
+Recall that the fitted model for the poverty rate of U.S. counties as a function of high school graduation rate is:  
+    
+povertyˆ=64.594−0.591⋅hs_grad   
+Which of the following is the correct interpretation of the slope coefficient?  
+  
+*Among U.S. counties, each additional percentage point increase in the high school graduation rate is associated with about a 0.591 percentage point decrease in the poverty rate.*
+
+**Fitting simple linear models**
+While the geom_smooth(method = "lm") function is useful for drawing linear models on a scatterplot, it doesn't actually return the characteristics of the model. As suggested by that syntax, however, **the function that creates linear models is lm()**. This function generally takes two arguments:  
+
+* A formula that specifies the model  
+* A data argument for the data frame that contains the data you want to use to fit the model  
+  
+The lm() function return a model object having class "lm". This object contains lots of information about your regression model, *including the data used to fit the model, the specification of the model, the fitted values and residuals, etc.  *
+
+```{r}
+# Linear model for weight as a function of height - the first input is the dependent variable(wgt)
+lm(wgt ~ hgt, data = bdims)
+
+# Linear model for SLG as a function of OBP
+lm(SLG ~ OBP, data = mlbBat10)
+
+# Log-linear model for body weight as a function of brain weight
+lm(log(BodyWt) ~ log(BrainWt), data = mammals)
+
+```
+The first two regression models can be represented by the following formulas:  
+
+wgtˆ=−105.011+1.018⋅hgt
+and
+SLGˆ=0.009+1.110⋅OBP  
+  
+### The linear model object
+The output of the lm() is an object and there is alot you can do with it!  
+After we assign the linear model to a model object, mod, we can use the coef() and summary() functions to extract more information.
+
+```{r}
+mod <- lm(wgt ~ hgt, data = bdims)
+
+# Show the coefficients
+coef(mod)
+
+# Show the full output
+summary(mod)
+```
+
+Confirm that the mean of the body weights equals the mean of the fitted values of mod.  
+Compute the mean of the residuals of mod.  
+
+```{r}
+# Mean of weights equal to mean of fitted values?
+mean(bdims$wgt) == mean(fitted.values(mod))
+
+# Mean of the residuals
+mean(residuals(mod))
+```
+
