@@ -1,0 +1,194 @@
+---
+title: "Logistic Regression"
+author: "Connor Guest"
+date: "6/17/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(openintro) # a bunch of data sets
+library(broom)
+library(plotly)
+```
+
+
+## Mulitple and Logistic Regression
+
+Allow you to model and predict numeric and categorical variables using mulitple input variables.
+Learn how to fit, visualize, and interptret the models.
+
+### What if you have two groups?
+Extend simple linear regression to a number fo variabels which can be both numeric and categorical
+Logistic regression allows us to model a binary response.
+
+Car example
+Want to look at fuel efficiency over time while controlling for engine size
+Use a parallel slopes model
+
+We will fit a parallel slopes model using lm(). In addition to the data argument, lm() needs to know which variables you want to include in your regression model, and how you want to include them. It accomplishes this using a formula argument. A simple linear regression formula looks like y ~ x, where y is the name of the response variable, and x is the name of the explanatory variable. Here, we will simply extend this formula to include multiple explanatory variables. A parallel slopes model has the form y ~ x + z, where z is a categorical explanatory variable, and x is a numerical explanatory variable.
+
+```{r}
+#mulitple regression
+glimpse(mtcars)
+mod <- lm(hwy ~ displ + factor(year), data = mpg) # need to make sure that r recognizes year as a categorical variable which is why you must use factor() 
+
+mod_aug <- augment(mod)
+
+# Plot lines with geom_line for predicted values
+ggplot(data = mod_aug, mapping = aes(y = hwy, x = displ, color = factor.year.)) +
+  geom_point(alpha = 0.3) +
+  geom_line(aes(y = .fitted), lwd = 1)
+```
+
+Parallel slopes models are so-named because we can visualize these models in the data space as not one line, but two parallel lines. 
+
+### Interpreting parallel slopes coefficients
+Most often our goal is to inpret the coefficients. What does the model tell us about the relationship between engine size and fuel economy in the context of the year the cars were manufactured?  
+
+Coefficients:  
+     (Intercept)             displ  factor(year)2008    
+          35.276            -3.611             1.402  
+          
+35.28 is the expected fuel economy of a car from 1999 with an engine size of 0 liters. Of course, there is no car with an engine of 0 liters so this is just an interpretation. the model tells us that for every additional liter in engine size there is a decrease of fuel economy by 3.611. 1.4 is the average difference between 1999 and 2008 in terms of mpg for the same type of car.
+Other notes  
+
+* There is only one slope and it relates to the numeric explanatory variable
+* Pay attention to the reference variable
+* Units are important - every coef has units that realte to the response variable 
+* The "after controlling for phrasing" is crucial to having valid understanding
+
+```{r}
+data(marioKart)
+glimpse(marioKart)
+# fit parallel slopes
+mod_kart <- lm(totalPr ~ wheels + cond, data = marioKart)
+
+mod_kart_aug <- augment(mod_kart) # %>% filter(totalPr < 100)
+glimpse(mod_kart_aug)
+
+# Plot lines with geom_line for predicted values
+ggplot(data = mod_kart_aug, mapping = aes(y = totalPr, x = wheels, color = cond)) +
+  geom_point(alpha = 0.3) +
+  geom_line(aes(y = .fitted), lwd = 1) +
+  ylim(25,80)
+```
+Interpretation of slope coef - For each additional wheel, the expected price of a MarioKart increases by $7.23 regardless of whether it is new or used.
+
+
+```{r}
+data(babies)
+glimpse(babies)
+
+#visually examine data
+ggplot(data = babies, mapping = aes(x = age, y = bwt, color = parity)) + geom_point()
+
+# build model for birthweight as a fucntion of mothers age and whether or not it is her first child
+lm(bwt ~ age + parity, data = babies)
+
+#visually examine data
+ggplot(data = babies, mapping = aes(x = gestation, y = bwt, color = factor(smoke))) + geom_point(alpha = .6)
+
+#  build a model for birthweight as a function of the length of gestation and the mother's smoking status
+lm(bwt ~ gestation + smoke, data = babies)
+
+
+```
+
+### Model Fit, Residuals, and Prediction
+
+Residuals are the differences between the actual value and the predicted(fitted) value from model (line of best fit)    
+Model fitting procedure minimizes the residuals over the entire data space.  
+Coef of determination (R^2) is the same as simple linear regression. It measures the percentage of the variability in the response variable that is explained by the model. To compute this, we define
+R2=1−SSE/SST
+
+The adjusted R^2 is used to determine model performcae for multiple linear regression. The only differece is that a penalty is applied as the number of explanatory variables increases.   
+R2adj=1−(SSE/SST)⋅(n−1/n−p−1)
+  
+We can see both measures in the output of the summary() function on our model object.
+
+Augment(mod) returns a data frame with the original values along with other calculations from the model inclduing the fitted values and errors. This function is used in the tidyverse from the broom package.  
+Making out of sample predictions - you can use augment(mod, newdata)
+
+```{r}
+# See how the r^2 values change just by adding an extra variable called noise to the marioKart dataset
+
+# R^2 and adjusted R^2
+summary(mod_kart)
+
+# add random noise
+mario_kart_noisy <- marioKart %>%
+  mutate(noise = rnorm(nrow(marioKart)))
+  
+# compute new model
+mod_kart_2 <- lm(totalPr ~ wheels + cond + noise, data = mario_kart_noisy)
+
+# new R^2 and adjusted R^2
+summary(mod_kart_2)
+
+# Make predictions
+augment(mod_kart_2)
+
+```
+
+### Fitting a model with interaction
+Including an interaction term in a model is easy—we just have to tell lm() that we want to include that new variable. The use of the colon (:) here means that the interaction between x and z will be a third term in the model.
+```{r}
+# interaction term
+# lm(y ~ x + z + x:z, data = mydata)
+# include interaction
+lm(totalPr ~ cond + duration + cond:duration, data = marioKart)
+
+```
+### Visualizing Interaction Models
+Interaction allows the slope of the regression line in each group to vary. In this case, this means that the relationship between the final price and the length of the auction is moderated by the condition of each item.   
+
+Interaction models are easy to visualize in the data space with ggplot2 because they have the same coefficients as if the models were fit independently to each group defined by the level of the categorical variable. In this case, new and used MarioKarts each get their own regression line. To see this, we can set an aesthetic (e.g. color) to the categorical variable, and then add a geom_smooth() layer to overlay the regression line for each color.
+
+```{r}
+# interaction plot
+ggplot(marioKart, aes(y = totalPr, x = duration, color = cond)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +
+  ylim(30,70)
+
+# simple linear regression plot
+ggplot(marioKart, aes(y = totalPr, x = duration)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = 0) +
+  ylim(30,70)
+
+lm(totalPr ~ duration, data = marioKart)
+
+# This is an exmaple of simpsons paradox. When you look at both used and new combined, the total price goes down with duration. But looking at them seperately shows what is really happening. 
+```
+### Simpson's Paradox
+
+"For every additional thousand dollars of salary for teachers in a particular state, the expected SAT score for a student from that state is about 2 points higher, after controlling for the percentage of students taking the SAT."
+
+## Multiple Linear Regression
+
+```{r}
+# Fit the model using duration and startPr - two numeric variables, instead of a categorical
+lm(totalPr ~ duration + startPr, data = marioKart)
+
+# visualizing MLR in 3D
+# draw the 3D scatterplot
+p <- plot_ly(data = marioKart, z = ~totalPr, x = ~duration, y = ~startPr, opacity = 0.6) %>%
+  add_markers() 
+p
+```
+
+
+
+
+
+
+
+
+
+

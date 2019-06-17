@@ -17,10 +17,17 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
+Summary
 Ultimately data analysis is about understanding the relationship between two variables.
 
 Statistical models have one variable as the output (response variable, y, aka dependent) and one or more as the input (explannatory variable, x, independent).
+
+Scatterplots can powerful in exploring bivariate relationships in an intuitive, graphical form.
+Use correlation to quantify strenght of a linear realtinoship between two variables using a single number.
+Use linear regression to model repsponse variable in terms of a single explanatory variable
+Learned to interpret the coefficients of regression models
+
+
 
 ```{r, message=FALSE}
 library(openintro)
@@ -29,6 +36,8 @@ library(knitr)
 library(dplyr)
 library(ggthemes)
 library(readr)
+library(tidyr)
+library(broom)
 ```
 
 
@@ -386,4 +395,176 @@ mean(bdims$wgt) == mean(fitted.values(mod))
 # Mean of the residuals
 mean(residuals(mod))
 ```
+
+As you fit a regression model, there are some quantities (e.g. R2) that apply to the model as a whole, while others apply to each observation (e.g. ŷ i). If there are several of these per-observation quantities, it is sometimes convenient to attach them to the original data as new variables.
+
+The **augment()** function from the broom package does exactly this. It takes a model object as an argument and returns a data frame that contains the data on which the model was fit, along with several quantities specific to the regression model, including the fitted values, residuals, leverage scores, and standardized residuals.
+
+```{r}
+# Load broom
+library(broom)
+
+# Create bdims_tidy
+bdims_tidy <- augment(mod)
+
+# Glimpse the resulting data frame
+glimpse(bdims_tidy)
+```
+
+Going back to the textbook example, by looking at residuals we can tell if certain if a certain book is under or over-priced in terms of what the model would predict. The residual is the difference between the prediction and the actual value.  
+
+### Making Predictions
+  
+The fitted.values() function or the augment()-ed data frame provides us with the fitted values for the observations that were in the original data. However, once we have fit the model, we may want to compute expected values for observations that were not present in the data on which the model was fit. These types of predictions are called out-of-sample.  
+  
+The ben data frame contains a height and weight observation for one person. The mod object contains the fitted model for weight as a function of height for the observations in the bdims dataset. We can use the predict() function to generate expected values for the weight of new individuals. We must pass the data frame of new observations through the newdata argument.  
+```{r}
+# create a new dataframe
+wgt <- 74.8
+hgt <- 182.8
+
+ben <- data.frame(wgt, hgt)
+
+# Print ben
+ben
+
+# Predict the weight of ben
+predict(mod, newdata = ben)
+
+```
+The geom_smooth() function makes it easy to add a simple linear regression line to a scatterplot of the corresponding variables. And in fact, there are more complicated regression models that can be visualized in the data space with geom_smooth(). However, there may still be times when we will want to add regression lines to our scatterplot manually. To do this, we will use the geom_abline() function, which takes slope and intercept arguments. Naturally, we have to compute those values ahead of time, but we already saw how to do this (e.g. using coef()).
+
+The coefs data frame contains the model estimates retrieved from coef(). Passing this to geom_abline() as the data argument will enable you to draw a straight line on your scatterplot.
+```{r}
+# Add the line to the scatterplot
+coefs <- data.frame(coef(mod))
+
+# ggplot(data = bdims, aes(x = hgt, y = wgt)) + 
+#   geom_point() + 
+#   geom_abline(data = coefs, 
+#               aes(intercept = `(Intercept)`, slope = hgt),  
+#               color = "dodgerblue")
+```
+## Residuals and Assessing Model Fit
+RMSE - root mean squared error - also, residual standard error - RSE  
+R displays this value when you get the summary of the the mod object  
+Example - if the value is 3.57 for mod_possum, that is saying that the model generally predicts a value within 3.57cm from the truth.  
+
+### Standard Error of Residuals
+  
+One way to assess strength of fit is to consider how far off the model is for a typical case. That is, for some observations, the fitted value will be very close to the actual value, while for others it will not. The magnitude of a typical residual can give us a sense of generally how close our estimates are.  
+  
+However, recall that some of the residuals are positive, while others are negative. In fact, it is guaranteed by the least squares fitting procedure that the mean of the residuals is zero. Thus, it makes more sense to compute the square root of the mean squared residual, or root mean squared error (RMSE). R calls this quantity the residual standard error.  
+
+To make this estimate unbiased, you have to divide the sum of the squared residuals by the degrees of freedom in the model.  
+You can recover the residuals from mod with **residuals()**, and the degrees of freedom with **df.residual()**.
+  
+```{r}
+# Use residuals() and df.residual() to compute the root mean squared error (RMSE), a.k.a. residual standard error.
+
+# View summary of model
+summary(mod)
+
+# Compute the mean of the residuals - should be equal to 0
+mean(residuals(mod))
+
+# Compute RMSE
+sqrt(sum(residuals(mod)^2) / df.residual(mod))
+```
+  
+### How do we evaluate the fit of the model that is unitless?
+y (hat) is the predicted value of y  
+y (bar) is the average value of y
+**the null average model is: y(hat) = y(bar)**  
+R^2 is the coefficient of determination - proportion of the variability in the response variable that is explained by the model
+Explains the quality of the fit of a regression model  
+> "Essentially all models are wrong, but some are useful" - Gearge Box  
+
+### Assessing Simple Linear Model Fit
+Recall that the coefficient of determination (R2), can be computed as
+R2=1−SSE/SST=1−Var(e)Var(y),
+where e is the vector of residuals and y is the response variable. This gives us the interpretation of R2 as the percentage of the variability in the response that is explained by the model, since the residuals are the part of that variability that remains unexplained by the model.
+
+```{r}
+# Use the bdims_tidy data frame to compute the R2 of mod manually using the formula above, by computing the ratio of the variance of the residuals to the variance of the response variable.
+
+# View model summary
+summary(mod)
+
+# Compute R-squared
+bdims_tidy %>%
+  summarize(var_y = var(wgt), var_e = var(.resid)) %>%
+  mutate(R_squared = 1 - var_e / var_y)
+```
+
+**The  R^2  represents the percentage of the variability of the response variable that can be explained by the explanatory variable.**  
+The R^2 reported for the regression model for poverty rate of U.S. counties in terms of high school graduation rate is 0.464.
+
+lm(formula = poverty ~ hs_grad, data = countyComplete) %>% summary()  
+  
+How should this result be interpreted?  
+
+46.4% of the variability in poverty rate among U.S. counties can be explained by high school graduation rate.
+
+### Linear vs. Average
+The R2 gives us a numerical measurement of the strength of fit relative to a null model based on the average of the response variable:
+ŷ null=y¯  
+This model has an R2 of zero because SSE=SST. That is, since the fitted values (ŷ null) are all equal to the average (y¯), the residual for each observation is the distance between that observation and the mean of the response. Since we can always fit the null model, it serves as a baseline against which all other models will be compared.  
+
+## Outliers
+### Leverage
+The leverage of an observation in a regression model is defined entirely in terms of the distance of that observation from the mean of the explanatory variable. That is, observations close to the mean of the explanatory variable have low leverage, while observations far from the mean of the explanatory variable have high leverage. Points of high leverage may or may not be influential.  
+  
+The augment() function from the broom package will add the leverage scores (.hat) to a model data frame.  
+
+```{r}
+# Use augment() to list the top 6 observations by their leverage scores, in descending order.
+# Rank points of high leverage
+
+# mod %>%
+#   augment() %>%
+#   arrange(desc(.hat)) %>%
+#   head()
+
+# # Rank influential points
+# mod %>%
+#   augment() %>%
+#   arrange(desc(.cooksd)) %>%
+#   head()
+```
+
+Observations can be outliers for a number of different reasons. Statisticians must always be careful—and more importantly, transparent—when dealing with outliers. Sometimes, a better model fit can be achieved by simply removing outliers and re-fitting the model. However, one must have strong justification for doing this. A desire to have a higher R2 is not a good enough reason!
+
+In the mlbBat10 data, the outlier with an OBP of 0.550 is Bobby Scales, an infielder who had four hits in 13 at-bats for the Chicago Cubs. Scales also walked seven times, resulting in his unusually high OBP. The justification for removing Scales here is weak. While his performance was unusual, there is nothing to suggest that it is not a valid data point, nor is there a good reason to think that somehow we will learn more about Major League Baseball players by excluding him.
+
+Nevertheless, we can demonstrate how removing him will affect our model.
+```{r}
+# Create nontrivial_players
+nontrivial_players <- mlbBat10 %>% filter(AB >= 10, OBP<.5)
+
+# Fit model to new data
+mod_cleaner <- lm(SLG ~ OBP, data = nontrivial_players)
+mod <- lm(SLG ~ OBP, data = mlbBat10)
+# View model summary
+summary(mod_cleaner)
+summary(mod)
+
+# Visualize new model
+ggplot(data = nontrivial_players, aes(x = OBP, y = SLG)) +
+  geom_point() + 
+  geom_smooth(method = "lm")
+
+# Rank high leverage, but lowest cooks distance points
+mod_cleaner %>%
+  augment() %>%
+  arrange(desc(.hat),.cooksd) %>%
+  head(6)
+
+
+
+
+```
+
+ 
+
 
